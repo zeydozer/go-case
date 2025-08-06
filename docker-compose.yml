@@ -1,0 +1,97 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:6.0
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example
+    volumes:
+      - ./mongo-db:/data/db
+  
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - ./zookeeper-data:/var/lib/zookeeper/data
+      - ./zookeeper-logs:/var/lib/zookeeper/log
+  
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    volumes:
+      - ./kafka-data:/var/lib/kafka/data
+  
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - ./rabbitmq-data:/var/lib/rabbitmq
+  
+  node-api:
+    build: ./node-api
+    container_name: node-api
+    ports:
+      - "3000:3000"
+    depends_on:
+      - kafka
+      - mongodb
+      - rabbitmq
+    environment:
+      MONGO_URI: mongodb://root:example@mongodb:27017
+      KAFKA_BROKER: kafka:29092
+      RABBITMQ_URI: amqp://guest:guest@rabbitmq:5672
+    volumes:
+      - ./node-api:/app
+      - /app/node_modules
+  
+  go-service:
+    build: ./go-service
+    container_name: go-service
+    ports:
+      - "8080:8080"
+    depends_on:
+      - kafka
+      - mongodb
+      - rabbitmq
+    environment:
+      MONGO_URI: mongodb://root:example@mongodb:27017
+      KAFKA_BROKER: kafka:29092
+      RABBITMQ_URI: amqp://guest:guest@rabbitmq:5672
+    volumes:
+      - ./go-service:/app
+  
+  react-app:
+    build: ./react-app
+    container_name: react-app
+    ports:
+      - "5173:3000"
+    volumes:
+      - ./react-app:/app
+      - /app/node_modules

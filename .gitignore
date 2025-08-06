@@ -1,9 +1,11 @@
-# Go binaries
-/bin
-/go-service
-
 # Node modules
 /node_modules
 
 # Build output
 /dist
+
+# Logs
+/logs
+
+# Mongo
+/mongo-db
